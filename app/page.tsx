@@ -2,30 +2,44 @@
 import { useEffect, useState } from "react";
 import supabase from "../lib/supabase";
 
+type Task = {
+  id: string;
+  name: string;
+  xp: number;
+  done?: boolean;
+};
+
 export default function Home() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [xp, setXP] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [xp, setXP] = useState<number>(0);
+  const [streak, setStreak] = useState<number>(0);
 
   useEffect(() => {
     fetchTasks();
   }, []);
 
   const fetchTasks = async () => {
-    let { data } = await supabase.from("tasks").select("*");
+    const { data, error } = await supabase.from("tasks").select("*");
 
-    if (!data || data.length === 0) {
+    if (error) {
+      console.log("FETCH ERROR:", error);
+      return;
+    }
+
+    let taskData = data;
+
+    if (!taskData || taskData.length === 0) {
       await supabase.from("tasks").insert([
         { name: "Gym", xp: 20 },
         { name: "Yocto", xp: 20 },
         { name: "No Porn", xp: 20 },
       ]);
 
-      let res = await supabase.from("tasks").select("*");
-      data = res.data;
+      const res = await supabase.from("tasks").select("*");
+      taskData = res.data;
     }
 
-    setTasks(data.map((t) => ({ ...t, done: false })));
+    setTasks(taskData!.map((t) => ({ ...t, done: false })));
   };
 
   const toggle = (i: number) => {
@@ -45,13 +59,17 @@ export default function Home() {
       alert("❌ No tasks done. Streak reset.");
       setStreak(0);
     } else {
-      setStreak(streak + 1);
+      setStreak((prev) => prev + 1);
     }
 
-    await supabase.from("daily_logs").insert({
+    const { error } = await supabase.from("daily_logs").insert({
       date: new Date().toISOString(),
       xp: xp,
     });
+
+    if (error) {
+      console.log("INSERT ERROR:", error);
+    }
 
     alert("Day saved 🔥");
   };
