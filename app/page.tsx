@@ -16,15 +16,11 @@ export default function Home() {
 
   useEffect(() => {
     fetchTasks();
+    fetchStats();
   }, []);
 
   const fetchTasks = async () => {
-    const { data, error } = await supabase.from("tasks").select("*");
-
-    if (error) {
-      console.log("FETCH ERROR:", error);
-      return;
-    }
+    const { data } = await supabase.from("tasks").select("*");
 
     let taskData: Task[] = data ?? [];
 
@@ -36,16 +32,23 @@ export default function Home() {
       ]);
 
       const res = await supabase.from("tasks").select("*");
-
-      if (res.error) {
-        console.log("INSERT FETCH ERROR:", res.error);
-        return;
-      }
-
       taskData = res.data ?? [];
     }
 
     setTasks(taskData.map((t) => ({ ...t, done: false })));
+  };
+
+  const fetchStats = async () => {
+    const { data } = await supabase.from("user_stats").select("*").limit(1);
+
+    if (data && data.length > 0) {
+      setStreak(data[0].streak);
+    } else {
+      // create first row
+      await supabase.from("user_stats").insert({
+        streak: 0,
+      });
+    }
   };
 
   const toggle = (i: number) => {
@@ -61,21 +64,55 @@ export default function Home() {
   };
 
   const saveDay = async () => {
-    if (xp === 0) {
-      alert("❌ No tasks done. Streak reset.");
-      setStreak(0);
-    } else {
-      setStreak((prev) => prev + 1);
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data } = await supabase
+      .from("user_stats")
+      .select("*")
+      .limit(1);
+
+    let currentStreak = 0;
+    let lastDate = null;
+
+    if (data && data.length > 0) {
+      currentStreak = data[0].streak;
+      lastDate = data[0].last_completed_date;
     }
 
-    const { error } = await supabase.from("daily_logs").insert({
-      date: new Date().toISOString(),
-      xp: xp,
+    let newStreak = currentStreak;
+
+    if (xp === 0) {
+      newStreak = 0;
+      alert("❌ No tasks done. Streak reset.");
+    } else {
+      if (!lastDate) {
+        newStreak = 1;
+      } else {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yDate = yesterday.toISOString().split("T")[0];
+
+        if (lastDate === yDate) {
+          newStreak = currentStreak + 1;
+        } else if (lastDate === today) {
+          newStreak = currentStreak; // already counted
+        } else {
+          newStreak = 1; // broke streak
+        }
+      }
+    }
+
+    await supabase.from("user_stats").update({
+      streak: newStreak,
+      last_completed_date: today,
     });
 
-    if (error) {
-      console.log("INSERT ERROR:", error);
-    }
+    setStreak(newStreak);
+
+    await supabase.from("daily_logs").insert({
+      date: today,
+      xp: xp,
+    });
 
     alert("Day saved 🔥");
   };
