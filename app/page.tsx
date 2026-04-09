@@ -1,22 +1,53 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import supabase from "../lib/supabase";
 
 export default function Home() {
-  const [tasks, setTasks] = useState([
-    { name: "Gym", xp: 20, done: false },
-    { name: "Yocto", xp: 20, done: false },
-    { name: "No Porn", xp: 20, done: false },
-  ]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [xp, setXP] = useState(0);
 
-  const toggle = (i: number) => {
-    const t = [...tasks];
-    t[i].done = !t[i].done;
-    setTasks(t);
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    let { data } = await supabase.from("tasks").select("*");
+
+    if (!data || data.length === 0) {
+      // first time → insert defaults
+      await supabase.from("tasks").insert([
+        { name: "Gym", xp: 20 },
+        { name: "Yocto", xp: 20 },
+        { name: "No Porn", xp: 20 },
+      ]);
+
+      let res = await supabase.from("tasks").select("*");
+      data = res.data;
+    }
+
+    setTasks(data.map(t => ({ ...t, done: false })));
   };
 
-  const xp = tasks
-    .filter(t => t.done)
-    .reduce((sum, t) => sum + t.xp, 0);
+  const toggle = (i: number) => {
+    const updated = [...tasks];
+    updated[i].done = !updated[i].done;
+    setTasks(updated);
+
+    const total = updated
+      .filter(t => t.done)
+      .reduce((sum, t) => sum + t.xp, 0);
+
+    setXP(total);
+  };
+
+  const saveDay = async () => {
+    await supabase.from("daily_logs").insert({
+      date: new Date().toISOString(),
+      xp: xp,
+    });
+
+    alert("Day saved 🔥");
+  };
 
   return (
     <div className="p-6">
@@ -27,7 +58,7 @@ export default function Home() {
 
       <div className="mt-4 space-y-2">
         {tasks.map((t, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={t.id} className="flex gap-2">
             <input
               type="checkbox"
               onChange={() => toggle(i)}
@@ -36,6 +67,13 @@ export default function Home() {
           </div>
         ))}
       </div>
+
+      <button
+        onClick={saveDay}
+        className="mt-4 bg-black text-white px-4 py-2 rounded"
+      >
+        End Day
+      </button>
     </div>
   );
 }
