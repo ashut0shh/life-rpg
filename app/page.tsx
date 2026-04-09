@@ -26,9 +26,9 @@ export default function Home() {
       return;
     }
 
-    let taskData = data;
+    let taskData: Task[] = data ?? [];
 
-    if (!taskData || taskData.length === 0) {
+    if (taskData.length === 0) {
       await supabase.from("tasks").insert([
         { name: "Gym", xp: 20 },
         { name: "Yocto", xp: 20 },
@@ -36,10 +36,16 @@ export default function Home() {
       ]);
 
       const res = await supabase.from("tasks").select("*");
-      taskData = res.data;
+
+      if (res.error) {
+        console.log("INSERT FETCH ERROR:", res.error);
+        return;
+      }
+
+      taskData = res.data ?? [];
     }
 
-    setTasks(taskData!.map((t) => ({ ...t, done: false })));
+    setTasks(taskData.map((t) => ({ ...t, done: false })));
   };
 
   const toggle = (i: number) => {
