@@ -5,6 +5,7 @@ import supabase from "../lib/supabase";
 export default function Home() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [xp, setXP] = useState(0);
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     fetchTasks();
@@ -14,7 +15,6 @@ export default function Home() {
     let { data } = await supabase.from("tasks").select("*");
 
     if (!data || data.length === 0) {
-      // first time → insert defaults
       await supabase.from("tasks").insert([
         { name: "Gym", xp: 20 },
         { name: "Yocto", xp: 20 },
@@ -25,7 +25,7 @@ export default function Home() {
       data = res.data;
     }
 
-    setTasks(data.map(t => ({ ...t, done: false })));
+    setTasks(data.map((t) => ({ ...t, done: false })));
   };
 
   const toggle = (i: number) => {
@@ -34,13 +34,20 @@ export default function Home() {
     setTasks(updated);
 
     const total = updated
-      .filter(t => t.done)
+      .filter((t) => t.done)
       .reduce((sum, t) => sum + t.xp, 0);
 
     setXP(total);
   };
 
   const saveDay = async () => {
+    if (xp === 0) {
+      alert("❌ No tasks done. Streak reset.");
+      setStreak(0);
+    } else {
+      setStreak(streak + 1);
+    }
+
     await supabase.from("daily_logs").insert({
       date: new Date().toISOString(),
       xp: xp,
@@ -55,15 +62,15 @@ export default function Home() {
 
       <h2 className="mt-4 text-xl">XP: {xp}</h2>
       <h3 className="text-lg">Level: {Math.floor(xp / 100)}</h3>
+      <h3 className="text-lg">🔥 Streak: {streak}</h3>
 
       <div className="mt-4 space-y-2">
         {tasks.map((t, i) => (
           <div key={t.id} className="flex gap-2">
-            <input
-              type="checkbox"
-              onChange={() => toggle(i)}
-            />
-            <span>{t.name} (+{t.xp})</span>
+            <input type="checkbox" onChange={() => toggle(i)} />
+            <span>
+              {t.name} (+{t.xp})
+            </span>
           </div>
         ))}
       </div>
